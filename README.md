@@ -6,6 +6,7 @@ This repository contains custom skills for Claude Code.
 
 - **claude-agent-ts-sdk** - Build Claude agents using TypeScript
 - **docx** - Document creation, editing, and analysis
+- **omeka-s** - Omeka S development guide (themes, modules, configuration)
 - **pdf** - Comprehensive PDF manipulation toolkit
 - **pptx** - Presentation creation, editing, and analysis
 - **skill-creator** - Guide for creating new skills
