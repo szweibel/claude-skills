@@ -202,10 +202,6 @@ The Search API V2 `/bibs-holdings` endpoint returns these symbols. Users typical
 
 ## Reference
 
-See reference files for detailed documentation:
-- [Metadata API Details](./reference/metadata-api.md)
-- [Search API V2 Details](./reference/search-api-v2.md)
-
 Official OCLC documentation:
 - Metadata API: https://www.oclc.org/developer/api/oclc-apis/worldcat-metadata-api.en.html
 - Search API V2: https://developer.api.oclc.org/wcv2
