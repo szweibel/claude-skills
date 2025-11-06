@@ -1,6 +1,8 @@
 ---
 name: claude-agent-ts-sdk
 description: Build Claude agents using TypeScript with the @anthropic-ai/claude-agent-sdk. Use this skill when implementing conversational agents, building tools for agents, setting up streaming responses, or debugging agent implementations. Covers the tool wrapping pattern, SDK initialization, agent architecture, and best practices.
+license: MIT
+category: development-tools
 ---
 
 # Claude Agent TypeScript SDK

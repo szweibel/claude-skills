@@ -1,6 +1,8 @@
 ---
 name: omeka-s
 description: Expert Omeka S developer assistant for Docker-based installations. Covers theme development (SCSS/CSS, templates), module creation (PHP, events, database), configuration management, and troubleshooting. Use for Omeka S customization from simple CSS tweaks to advanced module development.
+license: MIT
+category: api-integration
 ---
 
 # Omeka S Development Skill
