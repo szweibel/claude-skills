@@ -1,6 +1,8 @@
 ---
 name: svelte-5-runes
 description: Complete guide for Svelte 5 runes ($state, $derived, $effect, $props, $bindable). Use for any Svelte 5 project or when code contains $ prefixed runes. Essential for reactive state management, computed values, side effects, and component props. Covers migration from Svelte 4 reactive statements.
+license: MIT
+category: development-tools
 ---
 
 # Svelte 5 Runes

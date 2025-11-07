@@ -1,6 +1,8 @@
 ---
 name: worldcat-api
 description: Use OCLC WorldCat APIs to search for books and scholarly materials, retrieve bibliographic metadata, check library holdings worldwide, and get classification data. Use when working with ISBNs, DOIs, OCLC numbers, library catalogs, or institutional holdings.
+license: MIT
+category: api-integration
 ---
 
 # WorldCat API
