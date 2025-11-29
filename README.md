@@ -28,6 +28,7 @@ Tools for building applications and managing workflows.
 | Skill | Description | License |
 |-------|-------------|---------|
 | **[claude-agent-ts-sdk](claude-agent-ts-sdk/)** | Build Claude agents using TypeScript - tools, streaming, patterns | MIT |
+| **[frontend-design](frontend-design/)** | Create distinctive, production-grade frontend interfaces with high design quality | MIT |
 | **[svelte-5-runes](svelte-5-runes/)** | Complete guide for Svelte 5 reactive state management | MIT |
 | **[webapp-testing](webapp-testing/)** | Test local web applications using Playwright | Apache-2.0 |
 
@@ -78,7 +79,7 @@ See [skill-creator/SKILL.md](skill-creator/SKILL.md) for detailed guidance.
 ## License
 
 This collection contains skills under different licenses:
-- **MIT**: claude-agent-ts-sdk, omeka-s, worldcat-api, svelte-5-runes
+- **MIT**: claude-agent-ts-sdk, frontend-design, omeka-s, worldcat-api, svelte-5-runes
 - **Apache-2.0**: skill-creator, webapp-testing
 - **Proprietary**: docx, pdf, pptx, xlsx (see individual LICENSE.txt files)
 
