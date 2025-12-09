@@ -350,3 +350,330 @@ For new Omeka S projects:
 - **Forums:** https://forum.omeka.org/
 
 For detailed guidance on any topic, see the appropriate reference file above.
+
+## Critical Lessons Learned
+
+### Modern MariaDB Commands (2024+)
+
+Newer MariaDB Docker images use different command names:
+
+```bash
+# OLD (deprecated)
+docker exec omeka-s-db mysqladmin ping
+docker exec omeka-s-db mysql -u user -p database
+
+# NEW (current)
+docker exec omeka-s-db mariadb-admin ping  
+docker exec omeka-s-db mariadb -u user -p database
+```
+
+**Always use `mariadb` and `mariadb-admin` commands for compatibility.**
+
+### Block Layouts: Two Types
+
+Omeka S has two distinct types of block layouts that are registered differently:
+
+#### 1. Site Page Blocks (`block_layouts`)
+Used for **site pages** (like Time Periods, About, etc.)
+
+```php
+// In module.config.php
+'block_layouts' => [
+    'invokables' => [
+        'timePeriodsGrid' => MyModule\Site\BlockLayout\TimePeriodsGrid::class,
+    ],
+],
+```
+
+#### 2. Resource Page Blocks (`resource_page_block_layouts`)  
+Used for **item/media/item-set display pages**
+
+```php
+// In module.config.php
+'resource_page_block_layouts' => [
+    'invokables' => [
+        'relatedItems' => MyModule\Site\ResourcePageBlockLayout\RelatedItems::class,
+    ],
+],
+```
+
+**Key Difference:** Site page blocks go in regular pages; resource page blocks appear when viewing an item.
+
+### Using the API in Block Layouts
+
+**NEVER use direct database connections in blocks.** Use the API instead:
+
+```php
+// ❌ WRONG - Will fail
+$connection = $view->getHelperPluginManager()->get('api')->getManager()->getConnection();
+
+// ✅ CORRECT - Use the API
+$view->api()->search('items', [
+    'site_id' => $site->id(),
+    'property' => [[
+        'joiner' => 'and',
+        'property' => 'dcterms:coverage',
+        'type' => 'eq',
+        'text' => 'some value',
+    ]],
+]);
+```
+
+**Getting unique property values dynamically:**
+
+```php
+// Get property first
+$coverageProperty = $view->api()->searchOne('properties', [
+    'term' => 'dcterms:coverage',
+])->getContent();
+
+// Get all items with that property
+$allItems = $view->api()->search('items', [
+    'site_id' => $site->id(),
+    'has_property' => [$coverageProperty->id()],
+])->getContent();
+
+// Extract unique values
+$uniqueValues = [];
+foreach ($allItems as $item) {
+    $values = $item->value('dcterms:coverage', ['all' => true]);
+    foreach ($values as $val) {
+        $textValue = (string)$val;
+        if (!in_array($textValue, $uniqueValues)) {
+            $uniqueValues[] = $textValue;
+        }
+    }
+}
+```
+
+### Module Version Mismatches
+
+**Symptoms:**
+- Blocks render empty
+- "Unknown block layout" errors
+- Features not working despite module being active
+
+**Diagnosis:**
+
+```bash
+# Check file version
+docker exec omeka-s-app cat /var/www/html/modules/ModuleName/config/module.ini | grep version
+
+# Check database version
+docker exec omeka-s-db mariadb -u omekas -pomekas omekas -e "SELECT id, version FROM module WHERE id = 'ModuleName';"
+```
+
+**Solution:** Download the correct version from GitHub releases to match database expectations.
+
+### Custom Block Layout Template
+
+**Full working example of a site page block:**
+
+```php
+<?php
+namespace MyModule\Site\BlockLayout;
+
+use Omeka\Api\Representation\SiteRepresentation;
+use Omeka\Api\Representation\SitePageRepresentation;
+use Omeka\Api\Representation\SitePageBlockRepresentation;
+use Omeka\Site\BlockLayout\AbstractBlockLayout;
+use Laminas\View\Renderer\PhpRenderer;
+
+class MyCustomBlock extends AbstractBlockLayout
+{
+    public function getLabel()
+    {
+        return 'My Custom Block'; // @translate
+    }
+
+    public function form(
+        PhpRenderer $view,
+        SiteRepresentation $site,
+        SitePageRepresentation $page = null,
+        SitePageBlockRepresentation $block = null
+    ) {
+        // Get saved data
+        $data = $block ? $block->data() : [];
+        $myValue = $data['myValue'] ?? '';
+
+        // Return HTML form for admin
+        return sprintf(
+            '<div class="field"><label>My Setting</label><input type="text" name="o:block[__blockIndex__][o:data][myValue]" value="%s"></div>',
+            htmlspecialchars($myValue, ENT_QUOTES)
+        );
+    }
+
+    public function render(PhpRenderer $view, SitePageBlockRepresentation $block)
+    {
+        $site = $view->currentSite();
+        $data = $block->data();
+        
+        // Query items dynamically
+        $items = $view->api()->search('items', [
+            'site_id' => $site->id(),
+            'limit' => 10,
+        ])->getContent();
+
+        // Render template
+        return $view->partial('common/block-layout/my-custom-block', [
+            'items' => $items,
+            'data' => $data,
+        ]);
+    }
+}
+```
+
+### Block Data Storage
+
+Block configuration is stored as JSON in `site_page_block.data`:
+
+```sql
+-- View block data
+SELECT id, layout, data FROM site_page_block WHERE page_id = 10;
+
+-- Update block data (be careful with escaping!)
+UPDATE site_page_block 
+SET data = '{"key": "value"}' 
+WHERE id = 54;
+```
+
+**Important:** Data must be valid JSON. Use proper escaping when updating via SQL.
+
+### Querying with Property Filters
+
+```php
+// Search items by property value
+$response = $view->api()->search('items', [
+    'site_id' => $site->id(),
+    'property' => [[
+        'joiner' => 'and',           // 'and' or 'or'
+        'property' => 'dcterms:title', // property term
+        'type' => 'eq',               // 'eq', 'neq', 'in', 'nin', 'ex', 'nex'
+        'text' => 'search term',
+    ]],
+]);
+
+$count = $response->getTotalResults();
+$items = $response->getContent();
+```
+
+### CSS Loading System (CSSEditor Module)
+
+**Omeka S uses the CSSEditor module for custom CSS.** It provides two methods:
+
+1. **Inline CSS** (`css_editor_css`) - Written directly in admin interface
+2. **External CSS** (`css_editor_external_css`) - URLs to external CSS files
+
+**Database Storage:**
+
+```sql
+-- Check current CSS configuration
+SELECT id, value FROM site_setting WHERE id LIKE '%css%';
+
+-- Example output:
+css_editor_css                 (empty or contains CSS code)
+css_editor_external_css        ["/themes/foundation/asset/css/cdha-custom.css"]
+```
+
+**CSS Loading Order (Cascade):**
+
+```
+1. Core CSS (iconfonts.css, resource-page-blocks.css)
+2. Module CSS (from installed modules)
+3. Theme base CSS (default.css, inkwell.css, etc.)
+4. Inline CSS from css_editor_css (via /s/SITE/css-editor endpoint)
+5. External CSS from css_editor_external_css
+6. Additional module CSS
+```
+
+**Key Points:**
+
+- **Inline CSS loads BEFORE external CSS** - External files can override inline styles
+- Both are added by CSSEditor module, accessible via Admin → Sites → [Site] → Theme
+- External CSS URLs can be theme-relative paths or full CDN URLs
+- Inline CSS is stored directly in database; external CSS is just a reference
+
+**Common Issue: CSS Conflicts**
+
+If CSS changes don't appear:
+
+```sql
+-- Clear conflicting inline CSS
+UPDATE site_setting SET value = '' WHERE id = 'css_editor_css';
+
+-- Check what external files are referenced
+SELECT value FROM site_setting WHERE id = 'css_editor_external_css';
+```
+
+**Best Practice:**
+
+- Use **external CSS files** for maintainable, version-controlled styles
+- Use **inline CSS** only for quick tweaks or site-specific overrides
+- Reference external files via CSSEditor rather than hardcoding in templates
+
+**Real-World Example:**
+
+```json
+css_editor_external_css: ["/themes/foundation/asset/css/cdha-custom.css"]
+```
+
+This tells Omeka to load `cdha-custom.css` after the base theme CSS but load it as a separate file (not copied into the inline editor).
+
+### Template Precedence Order (CRITICAL!)
+
+**Omeka S loads templates in this order (highest to lowest priority):**
+
+1. **Theme templates** (`themes/THEME/view/`) - **HIGHEST PRIORITY**
+2. **Module templates** (`modules/MODULE/view/`)
+3. **Core templates** (`application/view/`) - LOWEST PRIORITY
+
+⚠️ **This means theme templates override EVERYTHING, including module templates.**
+
+**Real-World Example:**
+
+```bash
+# You edit this module template:
+modules/CdhaBlocks/view/common/resource-page-block-layout/filtered-values-main.phtml
+
+# But Omeka actually uses this theme template (if it exists):
+themes/foundation/view/common/resource-page-block-layout/filtered-values-main.phtml
+
+# Result: Your module changes don't appear, causing confusion!
+```
+
+**Debugging Template Issues:**
+
+When template changes don't appear:
+
+```bash
+# 1. Check if theme has override
+find themes/ACTIVE_THEME -name "template-name.phtml"
+
+# 2. If found, edit the THEME template, not the module template
+
+# 3. Use error logging to confirm which file loads:
+# Add to top of both templates:
+<?php error_log('TEMPLATE: ' . __FILE__); ?>
+```
+
+**Best Practice:**
+
+- Always check theme directory first before editing module templates
+- Use `grep -r` to find ALL instances of a template name
+- Remember: even resource page block templates can be overridden by themes
+
+**Common Symptoms:**
+
+- "I changed the module template but nothing happens"
+- "My debug logs in the module template don't appear"
+- "The module is being called but using old code"
+
+### Common Pitfalls
+
+1. **Don't hardcode values** - Query database dynamically
+2. **Don't use direct SQL** - Use API methods
+3. **Don't forget permissions** - `chown -R www-data:www-data` after file changes
+4. **Don't skip version checks** - Module version mismatches cause silent failures
+5. **Don't forget to restart** - `docker-compose restart omeka-s` after code changes
+6. **Don't edit module templates without checking for theme overrides** - Theme templates take precedence
+
